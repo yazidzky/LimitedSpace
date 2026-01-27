@@ -1,0 +1,38 @@
+; Engine configuration file.
+; It's best edited using the editor UI and not directly,
+; since the parameters that go here are not all obvious.
+;
+; Format:
+;   [section] ; section goes between []
+;   param=value ; assign values to parameters
+
+config_version=5
+
+[application]
+
+config/name="limitedspace"
+run/main_scene="uid://bi57p0g2qiqo5"
+config/features=PackedStringArray("4.5", "Forward Plus")
+
+[shader_globals]
+
+player_world_pos={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+player_depth_view={
+"type": "float",
+"value": 0.0
+}
+player_screen_uv={
+"type": "vec2",
+"value": Vector2(0, 0)
+}
+xray_enabled={
+"type": "bool",
+"value": false
+}
+visibility_radius={
+"type": "float",
+"value": 20.0
+}
