@@ -183,8 +183,8 @@ func _on_restart_pressed():
 
 func _on_main_menu_pressed():
 	_toggle_pause(false)
-	if has_node("/root/LoadingManager"): get_node("/root/LoadingManager").load_level("res://Tutorial.tscn")
-	else: get_tree().change_scene_to_file("res://Tutorial.tscn")
+	if has_node("/root/LoadingManager"): get_node("/root/LoadingManager").load_level("res://start_screen.tscn")
+	else: get_tree().change_scene_to_file("res://start_screen.tscn")
 
 func _toggle_pause(should_pause: bool):
 	get_tree().paused = should_pause
@@ -323,6 +323,10 @@ func _change_level():
 	if _loading_in_progress: return
 	set_physics_process(false)
 	_loading_in_progress = true
+	var gm = get_node_or_null("/root/GameManager")
+	if gm and gm.has_method("complete_level"):
+		gm.complete_level(get_tree().current_scene.scene_file_path)
+	
 	if has_node("/root/LoadingManager"):
 		get_node("/root/LoadingManager").load_level(next_level)
 	else:
