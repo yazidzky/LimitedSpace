@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cm2ou2jvfm7bh"
+path="res://.godot/imported/Clair Obscur_ Expedition 33 - Gustave (Original Soundtrack).mp3-4b571b1567b1c3670f48d10f62bb17ae.mp3str"
+
+[deps]
+
+source_file="res://Musik/Clair Obscur_ Expedition 33 - Gustave (Original Soundtrack).mp3"
+dest_files=["res://.godot/imported/Clair Obscur_ Expedition 33 - Gustave (Original Soundtrack).mp3-4b571b1567b1c3670f48d10f62bb17ae.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

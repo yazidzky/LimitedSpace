@@ -74,7 +74,7 @@ func _setup_teleport_system():
 func _print_all_children(node: Node, indent: int):
 	var s = ""
 	for i in range(indent): s += "  "
-	print(s + node.name + " (" + node.get_class() + ")")
+	# print(s + node.name + " (" + node.get_class() + ")") # Removed detailed print to avoid lag
 	for child in node.get_children():
 		_print_all_children(child, indent + 1)
 

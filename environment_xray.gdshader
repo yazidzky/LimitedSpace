@@ -42,6 +42,6 @@ void fragment() {
     // Full brightness up to 25m, then fades out to 50m
     float falloff = 1.0 - smoothstep(25.0, 50.0, world_dist);
     
-	ALBEDO = vec3(0.0, 1.0, 0.4); // Lime Green
-	ALPHA = 0.6 * falloff;
+	ALBEDO = vec3(0.0, 1.0, 0.4); // Restored Lime Green
+	ALPHA = 0.4 * falloff; // Restored visibility
 }

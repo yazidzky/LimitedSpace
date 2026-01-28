@@ -18,15 +18,18 @@ func _ready():
 	# Wait a frame for everything to settle
 	await get_tree().process_frame
 	
-	# Find Cube20 to use as spawn position
-	# Use find_child with recursive search to find it inside map1 (GLB)
-	var spawn_node = find_child("*ube20*", true, false)
+	# Find SpawnPoint first
+	var spawn_node = find_child("SpawnPoint", true, false)
+	
+	if not spawn_node:
+		# Fallback to scanning for Cube20 if SpawnPoint is missing
+		spawn_node = find_child("*ube20*", true, false)
 	
 	if spawn_node:
-		print("Spawn point Cube20 found at: ", spawn_node.global_position)
-		player.global_position = spawn_node.global_position + Vector3.UP * 1.5
-		# Ensure player faces a good direction
-		player.rotation = Vector3.ZERO
+		print("Spawn point found: ", spawn_node.name, " at ", spawn_node.global_position)
+		player.global_position = spawn_node.global_position
+		# Use marker rotation if available
+		player.rotation = spawn_node.rotation
 	else:
-		print("WARNING: Spawn node Cube20 not found. Using default position.")
+		print("WARNING: No valid spawn point found. Using default position.")
 		player.global_position = Vector3(0, 5, 0)

@@ -14,6 +14,21 @@ config/name="limitedspace"
 run/main_scene="uid://bi57p0g2qiqo5"
 config/features=PackedStringArray("4.5", "Forward Plus")
 
+[autoload]
+
+LoadingManager="res://loading_manager.gd"
+AudioManager="res://audio_manager.gd"
+
+[rendering]
+
+lights_and_shadows/directional_shadow/size=2048
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=1
+anti_aliasing/quality/msaa_3d=1
+environment/volumetric_fog/use_filter=0
+global_illumination/sdfgi/enabled=false
+global_illumination/ssao/enabled=false
+global_illumination/ssil/enabled=false
+
 [shader_globals]
 
 player_world_pos={

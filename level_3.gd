@@ -1,8 +1,6 @@
 extends Node3D
 
 var player_scene = preload("res://player_3d.tscn")
-var teleport_trigger: Node3D = null
-var teleport_target: Node3D = null
 var rotation_trigger: Node3D = null
 var map_node: Node3D = null
 var player_ref: Node3D = null
@@ -23,30 +21,31 @@ func _ready():
 	
 	player_ref = player
 	map_node = get_node("map3")
+
+	# Setup Level Transition Goal IMMEDIATELY (Specific Coordinates from User)
+	# User provided: X: 138.804, Y: -39.965, Z: -111.379
+	var exit_pos = Vector3(138.804, -39.965, -111.379)
+	var goal_marker_node = Marker3D.new()
+	goal_marker_node.name = "Map3Goal"
+	add_child(goal_marker_node)
+	goal_marker_node.global_position = exit_pos
 	
-	# Wait a frame for everything to settle
+	_create_marker(goal_marker_node, Color.CYAN, "EXIT")
+	print("Map 3 Exit Goal set IMMEDIATELY at: ", goal_marker_node.global_position)
+	
+	# Wait a frame for physics/rendering to settle
 	await get_tree().process_frame
 	
-	# 1. Setup Spawn and Portal Trigger
-	teleport_trigger = find_child("Cylinder_003", true, false)
-	if teleport_trigger:
-		# Shift slightly to the side and higher to avoid collision sticking
-		player.global_position = teleport_trigger.global_position + Vector3(2.0, 10.0, 2.0)
-		player.rotation = Vector3.ZERO
-		_create_marker(teleport_trigger, Color.CYAN, "Portal to Vantage Point")
+	# PORTAL REMOVED BY USER REQUEST
+	# The cylinder barrier/portal is no longer active.
 	
-	# 2. Setup Teleport Target and Rotation Trigger
-	teleport_target = find_child("Cube_862", true, false)
-	rotation_trigger = teleport_target # We use the same node for target and rotation trigger
+	# 2. Setup Rotation Trigger (Cube_862)
+	# Previously was also the teleport target, now just a rotation trigger if reached
+	rotation_trigger = find_child("Cube_862", true, false)
 	
-	if teleport_target:
-		_create_marker(teleport_target, Color.ORANGE, "Map Rotation Control")
+	if rotation_trigger:
+		_create_marker(rotation_trigger, Color.ORANGE, "Map Rotation Control")
 		
-	# Setup Level Transition Goal (Moving it to Cube_101)
-	# 3. Setup Level Transition Goal Marker
-	var goal_node = find_child("Cube_101", true, false)
-	if goal_node:
-		_create_marker(goal_node, Color.GREEN, "EXIT")
 
 func _create_marker(parent: Node3D, color: Color, label: String):
 	var marker = OmniLight3D.new()
@@ -81,12 +80,7 @@ func _create_marker(parent: Node3D, color: Color, label: String):
 func _physics_process(delta):
 	if not player_ref: return
 	
-	# 1. Handle Teleportation (Portal)
-	if teleport_trigger and teleport_target:
-		var dist = player_ref.global_position.distance_to(teleport_trigger.global_position)
-		if dist < 2.5:
-			print("Entering Portal...")
-			player_ref.global_position = teleport_target.global_position + Vector3.UP * 2.0
+	# 1. Portal Removed
 	
 	# 2. Handle Rotation Trigger
 	if rotation_trigger and map_node:

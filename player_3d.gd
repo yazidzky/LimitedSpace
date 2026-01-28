@@ -38,10 +38,39 @@ var spawn_position := Vector3.ZERO
 var spawn_rotation := Vector3.ZERO
 var _spawn_update_timer := 0.0
 var _spawn_locked := false  # Prevent spawn update during initial frames
+var _current_camera_dist: float = 12.0 # Current dynamic zoom level
+var _is_stabilizing := true
+var _stabilize_timer := 0.6 # Seconds to freeze on spawn
+
+# Sound Assets and State
+var _step_sounds := [
+	preload("res://player/sounds/robot_step_01.wav"),
+	preload("res://player/sounds/robot_step_02.wav"),
+	preload("res://player/sounds/robot_step_03.wav"),
+	preload("res://player/sounds/robot_step_04.wav"),
+	preload("res://player/sounds/robot_step_05.wav")
+]
+var _land_sound = preload("res://player/sounds/robot_land.wav")
+var _step_audio_player: AudioStreamPlayer3D
+var _land_audio_player: AudioStreamPlayer3D
+var _step_timer := 0.0
+@export var step_interval := 0.35
+var _was_on_floor := true
 
 func _ready():
 	add_to_group("player") 
 	print("--- PLAYER STARTUP: ", name, " ---")
+	
+	# Initialize Audio
+	_step_audio_player = AudioStreamPlayer3D.new()
+	add_child(_step_audio_player)
+	_step_audio_player.bus = &"Master"
+	_step_audio_player.max_distance = 20.0
+	
+	_land_audio_player = AudioStreamPlayer3D.new()
+	add_child(_land_audio_player)
+	_land_audio_player.bus = &"Master"
+	_land_audio_player.max_distance = 20.0
 	
 	# Connect to scene change signal to update spawn when level changes
 	get_tree().tree_changed.connect(_on_scene_changed)
@@ -86,6 +115,7 @@ func _ready():
 	# Wait a bit before saving spawn position to ensure player is stable
 	await get_tree().create_timer(0.5).timeout
 	_update_spawn_position()
+	_current_camera_dist = camera_dist
 	floor_snap_length = 1.5
 
 func _on_scene_changed():
@@ -203,6 +233,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 		has_target = true
 		_move_target_inst.global_position = target_position + up_direction * 0.05
+		
+		# Robust orientation for MoveTarget (flush to surface or plane)
+		var m_y = up_direction
+		if result and "normal" in result: m_y = result.normal
+		
+		# Proyeksi ke plane
+		var m_back_ref = Vector3.BACK.rotated(Vector3.UP, rotation.y)
+		var m_z = m_back_ref - m_back_ref.project(m_y)
+		if m_z.length() < 0.01: m_z = Vector3.FORWARD.rotated(Vector3.RIGHT, 0.1)
+		m_z = m_z.normalized()
+		var m_x = m_y.cross(m_z).normalized()
+		m_z = m_x.cross(m_y).normalized()
+		
+		_move_target_inst.global_basis = Basis(m_x, m_y, m_z)
 		_move_target_inst.visible = true
 
 	elif mouse_event.button_index == MOUSE_BUTTON_RIGHT:
@@ -214,23 +258,39 @@ func _unhandled_input(event: InputEvent) -> void:
 			_remove_player_xray()
 
 func _physics_process(delta: float) -> void:
+	# ===== STABILIZATION ON SPAWN =====
+	if _is_stabilizing:
+		velocity = Vector3.ZERO
+		_stabilize_timer -= delta
+		if _stabilize_timer <= 0:
+			_is_stabilizing = false
+			floor_snap_length = 2.0
+			apply_floor_snap()
+			print("Player stability achieved. Physics active.")
+		return
+
 	# ===== FALL DETECTION & RESPAWN =====
-	# Prevent cheating: Respawn if player falls more than 15 units below the last safe spawn point
-	if global_position.y < (spawn_position.y - 15.0):
-		print("RESPAWN: Player fell too far (relative)! Respawning at spawn point...")
-		_respawn_player()
-		return  # Skip rest of physics processing this frame
-	
-	# ===== AUTO-UPDATE SPAWN POSITION =====
-	# Update spawn position after player is stable on floor for a while in new level
-	if not _spawn_locked and is_on_floor():
-		_spawn_update_timer += delta
-		if _spawn_update_timer > 2.0:  # Wait 2 seconds of being on floor
-			_update_spawn_position()
-	elif not is_on_floor():
-		# Reset timer if player leaves floor
-		if not _spawn_locked:
-			_spawn_update_timer = 0.0
+	# Respawns at the INITIAL level spawn point (set in _ready)
+	# Increased threshold to allow for some verticality before reset
+	# Map 3 is very vertical, so we need a much lower threshold (e.g. 150m below spawn)
+	if gravity_shift_enabled:
+		# GRAVITY SHIFT MODE: Use Distance Check
+		# Player could fall in ANY direction (up, down, sideways) relative to world space
+		if global_position.distance_to(spawn_position) > 300.0:
+			print("RESPAWN: Player drifted too far into void! Resetting...")
+			_respawn_player()
+			return
+	else:
+		# STANDARD MODE: Use Y-Axis Check
+		if global_position.y < (spawn_position.y - 50.0):
+			print("RESPAWN: Player fell into void! Resetting...")
+			_respawn_player()
+			return
+
+	# ===== AUTO-UPDATE SPAWN POSITION DISABLED =====
+	# User Request: Always respawn at level start, never update spawn point during play.
+	# Logic removed.
+
 	# ===== GRAVITY SHIFT & PERSPECTIVE =====
 	if gravity_shift_enabled:
 		# Smoothly lerp perspective tilt and UP direction
@@ -248,8 +308,11 @@ func _physics_process(delta: float) -> void:
 		velocity -= vertical_vel
 
 	# ===== CAMERA FOLLOW =====
-	var dist_h = camera_dist * cos(deg_to_rad(-camera_pitch))
-	var height = camera_dist * sin(deg_to_rad(-camera_pitch))
+	# Gradually return to preferred distance if not forced by collision/occlusion
+	_current_camera_dist = lerp(_current_camera_dist, camera_dist, delta * 2.0)
+	
+	var dist_h = _current_camera_dist * cos(deg_to_rad(-camera_pitch))
+	var height = _current_camera_dist * sin(deg_to_rad(-camera_pitch))
 	
 	# Rotate camera around the CURRENT dynamic up direction
 	# This keeps the "above" view consistent relative to her local orientation
@@ -261,22 +324,27 @@ func _physics_process(delta: float) -> void:
 
 	# --- CAMERA COLLISION (All Levels) ---
 	var space_state = get_world_3d().direct_space_state
-	var ray_origin = global_position + up_direction * 1.5 # Sophia's head/shoulders area
+	# Cast from Sophia's chest/head outward to avoid starting inside she/floor
+	var ray_origin = global_position + up_direction * 1.5 
 	var query = PhysicsRayQueryParameters3D.create(ray_origin, ideal_cam_pos)
 	query.exclude = [self]
 	query.collision_mask = 1 # Environment collision
 	
 	var result = space_state.intersect_ray(query)
+	var collision_lerp_speed = camera_follow_speed
+	
 	if result:
 		# If obstructed, move camera closer to the hit point
 		# Add a small buffer to avoid clipping into the wall
 		var push_dir = (ray_origin - result.position).normalized()
 		final_cam_pos = result.position + push_dir * 0.8
+		# Use much faster lerp when moving TOWARDS the player (clipping)
+		collision_lerp_speed = 30.0 
 	
 	# Transition smoothly to the final position
 	_camera_pivot.global_position = _camera_pivot.global_position.lerp(
 		final_cam_pos,
-		(camera_follow_speed * 2.0 if result else camera_follow_speed) * delta
+		collision_lerp_speed * delta
 	)
 	
 	# 2. Apply Camera Orientation
@@ -301,7 +369,12 @@ func _physics_process(delta: float) -> void:
 	if occ_result and occ_result.collider != self:
 		# View is blocked by environment
 		_occlusion_timer += delta
-		if _occlusion_timer > 0.5:
+		
+		# Proactively zoom in if view is blocked
+		if _occlusion_timer > 0.2:
+			_current_camera_dist = lerp(_current_camera_dist, camera_dist * 0.4, delta * 5.0)
+			
+		if _occlusion_timer > 1.2:
 			# Auto-rotate 30 degrees to try and find a clear view
 			rotation.y = wrapf(rotation.y + deg_to_rad(30), -PI, PI)
 			_occlusion_timer = 0.0 # Reset to allow smooth transition
@@ -381,12 +454,37 @@ func _physics_process(delta: float) -> void:
 	var ground_vel = velocity - velocity.project(up_direction)
 	if ground_vel.length() > 0.1:
 		_skin.move()
+		# Step Sound Logic
+		if is_on_floor():
+			_step_timer += delta
+			if _step_timer >= step_interval:
+				_play_random_step()
+				_step_timer = 0.0
 	else:
 		_skin.idle()
+		_step_timer = step_interval # Reset timer so it plays immediately when starting to move
+
+	# Landing Sound Logic
+	if is_on_floor() and not _was_on_floor:
+		_play_land_sound()
+	_was_on_floor = is_on_floor()
+
+func _play_random_step():
+	if _step_sounds.is_empty(): return
+	var sound = _step_sounds.pick_random()
+	_step_audio_player.stream = sound
+	_step_audio_player.pitch_scale = randf_range(0.9, 1.1)
+	_step_audio_player.play()
+
+func _play_land_sound():
+	if not _land_sound: return
+	_land_audio_player.stream = _land_sound
+	_land_audio_player.pitch_scale = 1.0
+	_land_audio_player.play()
 
 func _perform_step_up(_delta):
 	# DYNAMIC STEP UP: Uses current gravity up_direction
-	var step_height = 1.2 # Max height to climb (enough for units)
+
 	var step_dist = 0.4
 	
 	# Get movement direction relative to the current plane

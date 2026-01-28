@@ -1,195 +1,329 @@
 extends Node
 
 @export var next_level: String = "res://level_1.tscn"
-@export var trigger_distance: float = 1.0
+@export var trigger_distance: float = 4.0
 
 var target_node: Node3D = null
 var player: Node3D = null
+var has_key := false
+
 var _hud: CanvasLayer = null
-var _dist_label: Label = null
+var _player_marker: Polygon2D = null
+var _dist_value: Label = null
+var _total_dist_label: Label = null
+var _bar: ColorRect = null
+var _initial_dist: float = 0.0
+var _key_container: HBoxContainer = null
+var _key_icons: Array[ColorRect] = []
+var _required_keys: Array[Node] = []
+var _exit_portal_node: Node3D = null
+var _collected_keys_count := 0
+
+# Pause Menu Refs
+var _pause_menu: Control = null
+var _resume_btn: Button = null
+var _restart_btn: Button = null
+var _menu_btn: Button = null
 
 func _ready():
 	print("--- LEVEL TRANSITION STARTUP ---")
-	await get_tree().process_frame # Wait for scene to settle
+	await get_tree().process_frame
 	_update_level_info()
 
 func _update_level_info():
-	# Determine Next Level based on Current Level
 	var current_scene = get_tree().current_scene
 	if not current_scene: return
 	
 	var scene_name = current_scene.name.to_lower()
 	print("Current Scene Name: ", scene_name)
 	
+	# Level Progression Logic
 	if ("level" in scene_name and "2" in scene_name) or ("map" in scene_name and "2" in scene_name):
 		next_level = "res://Map/level_3.tscn"
-		print("Detected Map 2: Next level set to ", next_level)
-		
 	elif ("level" in scene_name and "3" in scene_name) or ("map" in scene_name and "3" in scene_name):
 		next_level = "res://Tutorial.tscn"
-		print("Detected Map 3: Next level set to ", next_level)
-		
-	# Fallback/Default for Map 1
+	elif ("tutorial" in scene_name):
+		next_level = "res://level_1.tscn"
 	elif ("level" in scene_name and "1" in scene_name) or ("map" in scene_name and "1" in scene_name) or scene_name == "level_1" or scene_name == "map1":
 		next_level = "res://level_2.tscn"
-		print("Detected Map 1: Next level set to ", next_level)
 		
 	# Find Player
 	player = get_tree().get_first_node_in_group("player")
 	if not player: player = get_parent().find_child("*layer*", true, false)
 	
-	# Find Tower
-	target_node = _find_tower_node(get_tree().root)
+	# Find Exit Portal
+	_exit_portal_node = _find_tower_node(get_tree().current_scene)
+	
+	# Find Keys
+	_required_keys.clear()
+	var keys = get_tree().get_nodes_in_group("key")
+	for key in keys:
+		_required_keys.append(key)
+		if not key.is_connected("collected", _on_key_collected):
+			key.collected.connect(_on_key_collected)
+	
+	_collected_keys_count = 0
+	
+	if _required_keys.size() > 0:
+		has_key = false
+		_update_current_target()
+	else:
+		has_key = true # Auto-unlock if no key exists
+		target_node = _exit_portal_node
 	
 	if target_node:
-		print("SUCCESS: Locked onto Tower at ", target_node.global_position)
-		_create_debug_marker()
-		_setup_hud()
+		print("SUCCESS: Objective target set to ", target_node.name)
+		if not _hud: _setup_hud()
+		_calculate_initial_dist()
 	else:
-		print("CRITICAL ERROR: No transition target (Tower/Goal/Cube_042/Cube_046) found!")
+		print("CRITICAL ERROR: No transition target found!")
+
+func _update_current_target():
+	if has_key:
+		target_node = _exit_portal_node
+		return
+
+	# Find nearest uncollected key
+	var nearest_key = null
+	var min_dist = INF
+	
+	for key in _required_keys:
+		if is_instance_valid(key) and key.visible:
+			var d = player.global_position.distance_to(key.global_position)
+			if d < min_dist:
+				min_dist = d
+				nearest_key = key
+	
+	if nearest_key:
+		target_node = nearest_key
+	else:
+		target_node = _exit_portal_node
+
+func _on_key_collected():
+	_collected_keys_count += 1
+	print("OBJECTIVE UPDATE: Key collected! (", _collected_keys_count, "/", _required_keys.size(), ")")
+	
+	if _collected_keys_count <= _key_icons.size():
+		var icon = _key_icons[_collected_keys_count - 1]
+		if is_instance_valid(icon):
+			icon.color = Color(1, 0.9, 0.2) # Bright yellow/gold
+	
+	if _collected_keys_count >= _required_keys.size():
+		has_key = true
+		print("OBJECTIVE COMPLETE: All keys collected! Exit unlocked.")
+		_apply_portal_effects()
+	
+	_update_current_target()
+	_calculate_initial_dist() # Refresh progress bar for next stage
 
 func _setup_hud():
 	var hud_scene = preload("res://hud.tscn")
+	if not hud_scene: return
 	_hud = hud_scene.instantiate()
 	add_child(_hud)
-	_dist_label = _hud.get_node("%DistanceLabel")
+	_player_marker = _hud.get_node("%PlayerMarker")
+	_dist_value = _hud.get_node("%DistanceValue")
+	_total_dist_label = _hud.get_node("%TotalDistance")
+	_bar = _hud.get_node("Container/VBoxContainer/ProgressBarContainer/Bar")
+	_key_container = _hud.get_node("%KeyContainer")
+	
+	# Create dynamic key icons
+	_key_icons.clear()
+	if _key_container:
+		# Clear existing children (placeholders)
+		for child in _key_container.get_children():
+			child.queue_free()
+		
+		# Wait a frame for children to be removed
+		await get_tree().process_frame
+		
+		# Add new icons based on key count
+		for i in range(_required_keys.size()):
+			var icon_rect = ColorRect.new()
+			icon_rect.custom_minimum_size = Vector2(25, 25)
+			icon_rect.color = Color(0.2, 0.2, 0.2, 0.8) # Dark grey initially
+			
+			# Add a subtle border or something to make it look like a key slot
+			var border = ReferenceRect.new()
+			border.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			border.border_color = Color.BLACK
+			border.border_width = 2.0
+			border.editor_only = false
+			icon_rect.add_child(border)
+			
+			_key_container.add_child(icon_rect)
+			_key_icons.append(icon_rect)
+			
+			# If already collected (e.g. level reload)
+			if i < _collected_keys_count:
+				icon_rect.color = Color(1, 0.9, 0.2)
+	
+	# Initial Key Visual State
+	if _key_container:
+		_key_container.modulate = Color.WHITE if _required_keys.size() > 0 else Color.TRANSPARENT
+	
+	# Pause Menu Setup
+	_pause_menu = _hud.get_node("%PauseMenu")
+	_resume_btn = _hud.get_node("%ResumeButton")
+	_restart_btn = _hud.get_node("%RestartButton")
+	_menu_btn = _hud.get_node("%MainMenuButton")
+	
+	var pause_btn = _hud.get_node("%PauseButton")
+	if pause_btn: pause_btn.pressed.connect(_on_pause_pressed)
+	if _resume_btn: _resume_btn.pressed.connect(_on_resume_pressed)
+	if _restart_btn: _restart_btn.pressed.connect(_on_restart_pressed)
+	if _menu_btn: _menu_btn.pressed.connect(_on_main_menu_pressed)
 
-func _find_tower_node(root: Node) -> Node3D:
+func _on_pause_pressed(): _toggle_pause(true)
+func _on_resume_pressed(): _toggle_pause(false)
+func _on_restart_pressed():
+	_toggle_pause(false)
+	if player and player.has_method("_respawn_player"): player._respawn_player()
+	else: get_tree().reload_current_scene()
+
+func _on_main_menu_pressed():
+	_toggle_pause(false)
+	if has_node("/root/LoadingManager"): get_node("/root/LoadingManager").load_level("res://Tutorial.tscn")
+	else: get_tree().change_scene_to_file("res://Tutorial.tscn")
+
+func _toggle_pause(should_pause: bool):
+	get_tree().paused = should_pause
+	if _pause_menu: _pause_menu.visible = should_pause
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+
+func _calculate_initial_dist():
+	if player and target_node:
+		_initial_dist = player.global_position.distance_to(target_node.global_position)
+		if _total_dist_label: _total_dist_label.text = "%dm" % int(_initial_dist)
+
+func _find_tower_node(root: Node):
+	if not root: return null
+	
 	var current_scene = root.get_tree().current_scene
 	var scene_name = ""
-	if current_scene:
-		scene_name = current_scene.name.to_lower()
+	if current_scene: scene_name = current_scene.name.to_lower()
 	
-	print("Searching target for scene: ", scene_name)
-
-	# Context-Aware Search
+	# 1. Map Specific Logic
 	if "tutorial" in scene_name:
 		var t1 = root.find_child("Cube_046", true, false)
 		if t1: return t1
 	
-	# Map 3 Logic (Cube_101) - Check this BEFORE Map 2/1 to avoid partial matches on "level"
 	if ("level" in scene_name and "3" in scene_name) or ("map" in scene_name and "3" in scene_name):
-		var t3 = root.find_child("Cube_101", true, false)
-		if t3: return t3
+		var t3_goal = root.find_child("Map3Goal", true, false)
+		if t3_goal: return t3_goal
+		var t3_cube = root.find_child("Cube_101", true, false)
+		if t3_cube: return t3_cube
 
-	# Map 2 Logic (Cube_400 or Cube_042)
 	if ("level" in scene_name and "2" in scene_name) or ("map" in scene_name and "2" in scene_name):
 		var t2_goal = root.find_child("Cube_400", true, false)
 		if t2_goal: return t2_goal
-		
-		# Fallback to old name if needed
 		var t2_portal = root.find_child("Cube_042", true, false)
 		if t2_portal: return t2_portal
 		
-	# Map 1 Logic (Cube_042)
-	# Strict check to ensure we don't pick this up in Map 2
 	if ("level" in scene_name and "1" in scene_name) or ("map" in scene_name and "1" in scene_name) or scene_name == "level_1" or scene_name == "map1":
 		var t_map1 = root.find_child("Cube_042", true, false)
 		if t_map1: return t_map1
 
-	# Fallback: Check both if Scene Name didn't match specific logic
-	# Priority to Cube_046 if we are unsure, but try 042 first if it looks like a normal level
-	var t_fallback_1 = root.find_child("Cube_046", true, false)
-	var t_fallback_2 = root.find_child("Cube_042", true, false)
-	
-	if t_fallback_1 and "tutorial" in t_fallback_1.get_parent().name.to_lower(): return t_fallback_1
-	if t_fallback_2: return t_fallback_2
-	if t_fallback_1: return t_fallback_1
-	
-	# Last Resort: Generic Names
-	var t3 = root.find_child("*Tower*", true, false) 
-	if t3: return t3
-	
-	var t4 = root.find_child("*Goal*", true, false)
-	if t4: return t4
+	# 2. General Fallbacks
+	var names = ["Cube_046", "Cube_042", "Tower", "Goal"]
+	for n in names:
+		var t = root.find_child("*" + n + "*", true, false)
+		if t and t is Node3D:
+			return t
 
 	return null
 
-func _create_debug_marker():
-	# Create a visible light at the tower to show the goal
-	var light = OmniLight3D.new()
-	light.light_color = Color.GOLD
-	light.light_energy = 5.0
-	light.omni_range = 10.0
-	target_node.add_child(light)
-	print("Debug marker (Gold Light) created at Tower.")
-		
-func _physics_process(_delta):
-	# Periodically check if scene changed (hacky but works if signals aren't set up)
-	# Better: Call _update_level_info() when entering tree or via signal. 
-	# For now, we'll rely on _change_level calling it or checking dynamically.
+func _apply_portal_effects():
+	if not _exit_portal_node: return
 	
-	if not target_node or not player: 
+	print("PORTAL: Applying glow effects to ", _exit_portal_node.name)
+	
+	# Add a bright light to the portal
+	var portal_light = _exit_portal_node.find_child("PortalGlow", true, false)
+	if not portal_light:
+		portal_light = OmniLight3D.new()
+		portal_light.name = "PortalGlow"
+		_exit_portal_node.add_child(portal_light)
+	
+	portal_light.light_color = Color(1, 0.8, 0.2) # Golden
+	portal_light.light_energy = 15.0
+	portal_light.omni_range = 10.0
+	
+	# Try to find mesh to apply emission
+	var stack = [_exit_portal_node]
+	while stack.size() > 0:
+		var node = stack.pop_back()
+		if node is MeshInstance3D:
+			for i in range(node.get_surface_override_material_count()):
+				var mat = node.get_surface_override_material(i)
+				if mat is StandardMaterial3D:
+					mat.emission_enabled = true
+					mat.emission = Color(1, 0.8, 0.2)
+					mat.emission_energy_multiplier = 2.0
+		stack.append_array(node.get_children())
+
+func _physics_process(_delta):
+	if _required_keys.size() > 0 and not has_key:
+		_update_current_target()
+
+	if not target_node:
+		_update_level_info()
+		return
+		
+	if not player: 
+		player = get_tree().get_first_node_in_group("player")
 		return
 	
-	var dist = player.global_position.distance_to(target_node.global_position)
+	# 1. Handle Objective UI & HUD
+	var dist_to_target = player.global_position.distance_to(target_node.global_position)
+	_update_ui(dist_to_target)
 	
-	if _dist_label:
-		_dist_label.text = "Distance: %.1f m" % dist
+	# 2. Robust Backup Pickup
+	if not has_key and target_node.is_in_group("key"):
+		if dist_to_target < 1.5:
+			if target_node.has_method("_collect"):
+				target_node._collect()
 	
-	# Check distance
-	if dist < 4.0: 
-		print("PLAYER REACHED TOWER! Distance: ", dist)
-		_change_level()
+	# 3. Check for EXIT GOAL
+	if _exit_portal_node:
+		var dist_to_exit = player.global_position.distance_to(_exit_portal_node.global_position)
+		if dist_to_exit < trigger_distance:
+			if has_key:
+				_change_level()
+			else:
+				if _dist_value and _dist_value.text != "NEED KEY!":
+					var old_text = _dist_value.text
+					_dist_value.text = "NEED KEY!"
+					_dist_value.modulate = Color.RED
+					await get_tree().create_timer(1.5).timeout
+					if is_instance_valid(_dist_value):
+						_dist_value.modulate = Color.WHITE
+						_dist_value.text = old_text
+
+func _update_ui(current_dist: float):
+	if not _hud: return
+	
+	if _dist_value:
+		var prefix = "KEY: " if not has_key and _required_keys.size() > 0 else "GOAL: "
+		_dist_value.text = prefix + "%dm" % int(current_dist)
+	
+	if _initial_dist > 0:
+		var progress = 1.0 - clamp(current_dist / _initial_dist, 0.0, 1.0)
+		var bar_width = 500.0
+		if _player_marker: _player_marker.position.x = progress * bar_width
+		if _bar: _bar.size.x = progress * bar_width
 
 func _input(event):
-	# DEBUG: Press 'L' to force level change
 	if event is InputEventKey and event.pressed and event.keycode == KEY_L:
-		print("Forcing level change via 'L' key.")
-		_update_level_info() # Ensure info is up to date
 		_change_level()
 
 var _loading_in_progress = false
-var _loading_next_scene = ""
 
 func _change_level():
 	if _loading_in_progress: return
-	
-	# Stop script from running multiple times
 	set_physics_process(false)
-	print("Starting Threaded Load for: ", next_level)
-	
-	_loading_next_scene = next_level
 	_loading_in_progress = true
-	
-	# Show loading UI
-	if _dist_label:
-		_dist_label.text = "Loading Next Level..."
-	
-	# Request background load
-	var err = ResourceLoader.load_threaded_request(_loading_next_scene)
-	if err != OK:
-		print("THREADED LOAD REQUEST FAILED: ", err)
-		_loading_in_progress = false
-		set_physics_process(true)
-		return
-	
-	# Switch to process polling
-	set_process(true)
-
-func _process(_delta):
-	if not _loading_in_progress: return
-	
-	var progress = []
-	var status = ResourceLoader.load_threaded_get_status(_loading_next_scene, progress)
-	
-	if _dist_label:
-		var p_val = 0
-		if progress.size() > 0: p_val = int(progress[0] * 100)
-		_dist_label.text = "Loading: %d%%" % p_val
-	
-	match status:
-		ResourceLoader.THREAD_LOAD_LOADED:
-			print("Scene Loaded! Switching...")
-			var packed_scene = ResourceLoader.load_threaded_get(_loading_next_scene)
-			get_tree().change_scene_to_packed(packed_scene)
-			_loading_in_progress = false
-			set_process(false)
-		ResourceLoader.THREAD_LOAD_FAILED:
-			print("THREAD LOAD FAILED")
-			_loading_in_progress = false
-			set_process(false)
-		ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			print("THREAD LOAD INVALID")
-			_loading_in_progress = false
-			set_process(false)
+	if has_node("/root/LoadingManager"):
+		get_node("/root/LoadingManager").load_level(next_level)
+	else:
+		get_tree().change_scene_to_file(next_level)
