@@ -24,11 +24,19 @@ var _pause_menu: Control = null
 var _resume_btn: Button = null
 var _restart_btn: Button = null
 var _menu_btn: Button = null
+var _guide_arrow: Node3D = null
+var tutorial_guide_active: bool = false
 
 func _ready():
 	print("--- LEVEL TRANSITION STARTUP ---")
 	await get_tree().process_frame
 	_update_level_info()
+	
+	# Tutorial Overlay Injection
+	var current_scene = get_tree().current_scene
+	if current_scene and "tutorial" in current_scene.name.to_lower():
+		var tut_overlay = load("res://tutorial_overlay.tscn").instantiate()
+		add_child(tut_overlay)
 
 func _update_level_info():
 	var current_scene = get_tree().current_scene
@@ -113,6 +121,11 @@ func _on_key_collected():
 		print("OBJECTIVE COMPLETE: All keys collected! Exit unlocked.")
 		_apply_portal_effects()
 	
+	# CHECKPOINT: Update player spawn position to current position
+	if player and player.has_method("_update_spawn_position"):
+		player._update_spawn_position()
+		print("CHECKPOINT: Player spawn point updated to current location.")
+	
 	_update_current_target()
 	_calculate_initial_dist() # Refresh progress bar for next stage
 
@@ -169,10 +182,65 @@ func _setup_hud():
 	_menu_btn = _hud.get_node("%MainMenuButton")
 	
 	var pause_btn = _hud.get_node("%PauseButton")
+	
+	# Apply Styles
+	_style_button(_resume_btn)
+	_style_button(_restart_btn)
+	_style_button(_menu_btn)
+	_style_button(pause_btn)
+	
 	if pause_btn: pause_btn.pressed.connect(_on_pause_pressed)
 	if _resume_btn: _resume_btn.pressed.connect(_on_resume_pressed)
 	if _restart_btn: _restart_btn.pressed.connect(_on_restart_pressed)
 	if _menu_btn: _menu_btn.pressed.connect(_on_main_menu_pressed)
+
+func _style_button(btn: Button):
+	if not btn: return
+	
+	# Reference-inspired "Green Juicy" Style
+	var base_green = Color("74c636") # Vibrant Green
+	var dark_green = Color("4b8b22") # Darker Green/Shadow
+	var light_green = Color("8be645") # Highlight Green
+	
+	# Normal Style
+	var style_normal = StyleBoxFlat.new()
+	style_normal.bg_color = base_green
+	style_normal.corner_radius_top_left = 16
+	style_normal.corner_radius_top_right = 16
+	style_normal.corner_radius_bottom_right = 16
+	style_normal.corner_radius_bottom_left = 16
+	style_normal.border_width_bottom = 6
+	style_normal.border_color = dark_green
+	style_normal.shadow_size = 2
+	style_normal.shadow_offset = Vector2(0, 2)
+	
+	# Hover Style
+	var style_hover = style_normal.duplicate()
+	style_hover.bg_color = light_green
+	
+	# Pressed Style
+	var style_pressed = style_normal.duplicate()
+	style_pressed.bg_color = base_green
+	style_pressed.border_width_bottom = 2 # Compressed effect
+	style_pressed.border_width_top = 4 # Shift down visual
+	style_pressed.shadow_size = 0
+	
+	# Disabled Style
+	var style_disabled = style_normal.duplicate()
+	style_disabled.bg_color = Color("555555")
+	style_disabled.border_color = Color("333333")
+	
+	btn.add_theme_stylebox_override("normal", style_normal)
+	btn.add_theme_stylebox_override("hover", style_hover)
+	btn.add_theme_stylebox_override("pressed", style_pressed)
+	btn.add_theme_stylebox_override("disabled", style_disabled)
+	btn.add_theme_stylebox_override("focus", style_normal) # No focus ring
+	
+	# Text styling
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_outline_color", Color("2a4d13"))
+	btn.add_theme_constant_override("outline_size", 4)
+	btn.add_theme_constant_override("font_size", 24)
 
 func _on_pause_pressed(): _toggle_pause(true)
 func _on_resume_pressed(): _toggle_pause(false)
@@ -190,6 +258,11 @@ func _toggle_pause(should_pause: bool):
 	get_tree().paused = should_pause
 	if _pause_menu: _pause_menu.visible = should_pause
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
+	# Hide Tutorial Overlay when Paused
+	var tut_overlay = get_node_or_null("TutorialOverlay")
+	if tut_overlay:
+		tut_overlay.visible = not should_pause
 
 func _calculate_initial_dist():
 	if player and target_node:
@@ -277,6 +350,28 @@ func _physics_process(_delta):
 	# 1. Handle Objective UI & HUD
 	var dist_to_target = player.global_position.distance_to(target_node.global_position)
 	_update_ui(dist_to_target)
+	
+	# 3D GUIDE ARROW Logic
+	if not is_instance_valid(_guide_arrow):
+		var arrow_scene = load("res://guide_arrow.tscn")
+		if arrow_scene:
+			_guide_arrow = arrow_scene.instantiate()
+			player.add_child(_guide_arrow)
+			_guide_arrow.top_level = true # Independent transform
+	
+	if is_instance_valid(_guide_arrow) and is_instance_valid(target_node):
+		# Follow player
+		_guide_arrow.global_position = player.global_position + Vector3(0, 2.5, 0)
+		# Point to target
+		_guide_arrow.look_at(target_node.global_position, Vector3.UP)
+		_guide_arrow.rotation.x = 0 
+		
+		# Visibility Logic: Show only if has_key OR is tutorial (and tutorial active)
+		var is_tutorial = "tutorial" in get_tree().current_scene.name.to_lower()
+		_guide_arrow.visible = (is_tutorial and tutorial_guide_active) or has_key
+		
+	elif is_instance_valid(_guide_arrow):
+		_guide_arrow.visible = false
 	
 	# 2. Robust Backup Pickup
 	if not has_key and target_node.is_in_group("key"):
