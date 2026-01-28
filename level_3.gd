@@ -45,6 +45,11 @@ func _ready():
 	
 	if rotation_trigger:
 		_create_marker(rotation_trigger, Color.ORANGE, "Map Rotation Control")
+
+	# Show vertical wall climbing warning
+	var warning_scene = preload("res://warning_dialog.tscn")
+	var warning_instance = warning_scene.instantiate()
+	add_child(warning_instance)
 		
 
 func _create_marker(parent: Node3D, color: Color, label: String):

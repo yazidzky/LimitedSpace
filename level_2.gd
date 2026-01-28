@@ -32,6 +32,11 @@ func _ready():
 	# Teleportation Setup for Map 2
 	_setup_teleport_system()
 
+	# Show vertical wall climbing warning
+	var warning_scene = preload("res://warning_dialog.tscn")
+	var warning_instance = warning_scene.instantiate()
+	add_child(warning_instance)
+
 var player_ref: Node3D = null
 var teleport_pairs: Array = [] # Array of dicts: { "trigger": Node3D, "target": Node3D, "cooldown": float }
 
