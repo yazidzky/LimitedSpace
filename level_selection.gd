@@ -95,7 +95,7 @@ func _update_cards():
 		var lock = card.get_node_or_null("LockIcon")
 		var play_btn = card.get_node_or_null("PlayButton")
 		
-		# Setup 2D Preview (FULL CARD)
+# Setup 2D Preview (FULL CARD)
 		var preview_container = card.get_node_or_null("PreviewContainer")
 		if preview_container and i < preview_images.size():
 			# Force Container to fill the card
@@ -104,6 +104,35 @@ func _update_cards():
 			# Clear previous preview if any
 			for child in preview_container.get_children():
 				child.queue_free()
+			
+			# Create a Mask Panel for Rounded Corners
+			var mask_panel = Panel.new()
+			mask_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+			mask_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			
+			# Define Rounded Style
+			var style_box = StyleBoxFlat.new()
+			style_box.corner_radius_top_left = 30
+			style_box.corner_radius_top_right = 30
+			style_box.corner_radius_bottom_right = 30
+			style_box.corner_radius_bottom_left = 30
+			style_box.bg_color = Color(1, 1, 1, 1) # Opaque for mask
+			# Add a subtle shadow/border to the card shape
+			style_box.border_width_left = 6
+			style_box.border_width_top = 6
+			style_box.border_width_right = 6
+			style_box.border_width_bottom = 6
+			style_box.border_color = Color(0.8, 0.5, 0.3, 1) # Cardboard-ish border
+			style_box.shadow_size = 4
+			style_box.shadow_offset = Vector2(0, 4)
+			
+			mask_panel.add_theme_stylebox_override("panel", style_box)
+			
+			# Enable Clipping
+			# 1 = CLIP_CHILDREN_ONLY (Godot 4.0+)
+			mask_panel.clip_children = 1 
+			
+			preview_container.add_child(mask_panel)
 				
 			var texture_rect = TextureRect.new()
 			# Safety check for loading image
@@ -115,7 +144,7 @@ func _update_cards():
 			texture_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			texture_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED # Full cover
 			texture_rect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			preview_container.add_child(texture_rect)
+			mask_panel.add_child(texture_rect)
 			
 			# Add a dim overlay for text readability if needed, or gradient at bottom
 			var gradient = TextureRect.new()
@@ -128,7 +157,7 @@ func _update_cards():
 			gradient.texture = grad_tex
 			gradient.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			gradient.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-			preview_container.add_child(gradient)
+			mask_panel.add_child(gradient)
 		
 		var gm = get_node_or_null("/root/GameManager")
 		var is_unlocked = i < (gm.unlocked_levels if gm else 1)
