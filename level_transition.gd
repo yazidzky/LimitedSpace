@@ -55,7 +55,7 @@ func _update_level_info():
 	if ("level" in scene_name and "2" in scene_name) or ("map" in scene_name and "2" in scene_name):
 		next_level = "res://Map/level_3.tscn"
 	elif ("level" in scene_name and "3" in scene_name) or ("map" in scene_name and "3" in scene_name):
-		next_level = "res://Tutorial.tscn"
+		next_level = "res://start_screen.tscn"
 	elif ("tutorial" in scene_name):
 		next_level = "res://level_1.tscn"
 	elif ("level" in scene_name and "1" in scene_name) or ("map" in scene_name and "1" in scene_name) or scene_name == "level_1" or scene_name == "map1":
