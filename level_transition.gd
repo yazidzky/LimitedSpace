@@ -27,6 +27,12 @@ var _menu_btn: Button = null
 var _guide_arrow: Node3D = null
 var tutorial_guide_active: bool = false
 
+# Victory Menu Refs
+var _victory_menu: Control = null
+var _victory_next_btn: Button = null
+var _victory_menu_btn: Button = null
+var _percentage_label: Label = null
+
 func _ready():
 	print("--- LEVEL TRANSITION STARTUP ---")
 	await get_tree().process_frame
@@ -138,6 +144,7 @@ func _setup_hud():
 	_dist_value = _hud.get_node("%DistanceValue")
 	_total_dist_label = _hud.get_node("%TotalDistance")
 	_bar = _hud.get_node("Container/VBoxContainer/ProgressBarContainer/Bar")
+	_percentage_label = _hud.get_node("%PercentageLabel")
 	_key_container = _hud.get_node("%KeyContainer")
 	
 	# Create dynamic key icons
@@ -193,6 +200,17 @@ func _setup_hud():
 	if _resume_btn: _resume_btn.pressed.connect(_on_resume_pressed)
 	if _restart_btn: _restart_btn.pressed.connect(_on_restart_pressed)
 	if _menu_btn: _menu_btn.pressed.connect(_on_main_menu_pressed)
+	
+	# Victory Menu Setup
+	_victory_menu = _hud.get_node("%VictoryMenu")
+	_victory_next_btn = _hud.get_node("%NextLevelButton")
+	_victory_menu_btn = _hud.get_node("%MenuButtonVictory")
+	
+	_style_button(_victory_next_btn)
+	_style_button(_victory_menu_btn)
+	
+	if _victory_next_btn: _victory_next_btn.pressed.connect(_on_next_level_pressed)
+	if _victory_menu_btn: _victory_menu_btn.pressed.connect(_on_main_menu_pressed)
 
 func _style_button(btn: Button):
 	if not btn: return
@@ -407,6 +425,14 @@ func _update_ui(current_dist: float):
 		var bar_width = 500.0
 		if _player_marker: _player_marker.position.x = progress * bar_width
 		if _bar: _bar.size.x = progress * bar_width
+		if _percentage_label:
+			_percentage_label.text = "%d%%" % int(progress * 100)
+		
+		# Update Game Manager Progress
+		var gm = get_node_or_null("/root/GameManager")
+		if gm and gm.has_method("update_level_progress"):
+			var scene_path = get_tree().current_scene.scene_file_path
+			gm.update_level_progress(scene_path, int(progress * 100))
 
 
 
@@ -414,11 +440,24 @@ var _loading_in_progress = false
 
 func _change_level():
 	if _loading_in_progress: return
-	set_physics_process(false)
+	
+	# Instead of changing immediately, show Victory Screen
+	if _victory_menu:
+		set_physics_process(false) # Stop gameplay
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		_victory_menu.visible = true
+		
+		# Save Progress Immediately on Victory
+		var gm = get_node_or_null("/root/GameManager")
+		if gm and gm.has_method("complete_level"):
+			gm.complete_level(get_tree().current_scene.scene_file_path)
+	else:
+		# Fallback if no HUD
+		_on_next_level_pressed()
+
+func _on_next_level_pressed():
+	if _loading_in_progress: return
 	_loading_in_progress = true
-	var gm = get_node_or_null("/root/GameManager")
-	if gm and gm.has_method("complete_level"):
-		gm.complete_level(get_tree().current_scene.scene_file_path)
 	
 	if has_node("/root/LoadingManager"):
 		get_node("/root/LoadingManager").load_level(next_level)

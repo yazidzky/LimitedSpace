@@ -159,8 +159,28 @@ func _update_cards():
 			gradient.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			mask_panel.add_child(gradient)
 		
+		# Update Progress Label
+		var progress_label = card.get_node_or_null("ProgressLabel")
+		
 		var gm = get_node_or_null("/root/GameManager")
 		var is_unlocked = i < (gm.unlocked_levels if gm else 1)
+		
+		if progress_label:
+			if is_unlocked:
+				var level_path = gm.levels[i] if gm and i < gm.levels.size() else ""
+				var best_percent = 0
+				if gm and gm.level_best_progress.has(level_path):
+					best_percent = gm.level_best_progress[level_path]
+				
+				if best_percent >= 100:
+					progress_label.text = "COMPLETED"
+					progress_label.add_theme_color_override("font_color", Color(0.2, 1.0, 0.2)) # Green
+				else:
+					progress_label.text = "Best: %d%%" % best_percent
+					progress_label.add_theme_color_override("font_color", Color.WHITE)
+			else:
+				progress_label.text = "LOCKED"
+				progress_label.add_theme_color_override("font_color", Color(0.6, 0.6, 0.6)) # Grey
 		
 		if lock:
 			lock.visible = not is_unlocked
