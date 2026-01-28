@@ -408,9 +408,7 @@ func _update_ui(current_dist: float):
 		if _player_marker: _player_marker.position.x = progress * bar_width
 		if _bar: _bar.size.x = progress * bar_width
 
-func _input(event):
-	if event is InputEventKey and event.pressed and event.keycode == KEY_L:
-		_change_level()
+
 
 var _loading_in_progress = false
 
