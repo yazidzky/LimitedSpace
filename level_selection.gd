@@ -156,8 +156,25 @@ func _update_cards():
 			grad_tex.gradient.colors = PackedColorArray([Color(0,0,0,0), Color(0,0,0,0.8)])
 			gradient.texture = grad_tex
 			gradient.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			gradient.texture = grad_tex
+			gradient.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			gradient.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 			mask_panel.add_child(gradient)
+		
+		# Ensure Title Label is visible and styled
+		var title_label = card.get_node_or_null("Label")
+		if title_label:
+			card.move_child(title_label, -1) # Ensure it draws on top of the image
+			title_label.add_theme_color_override("font_outline_color", Color.BLACK)
+			title_label.add_theme_constant_override("outline_size", 10)
+			title_label.add_theme_font_size_override("font_size", 36)
+			
+			# Only show title for Tutorial, hide for others
+			if i == 0:
+				title_label.text = "TUTORIAL"
+				title_label.visible = true
+			else:
+				title_label.visible = false
 		
 		# Update Progress Label
 		var progress_label = card.get_node_or_null("ProgressLabel")
