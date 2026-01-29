@@ -9,8 +9,8 @@ var _level_music = {
 	"level_1": "res://Musik/Old_Chimney_maintheme.mp3",
 	"level_2": "res://Musik/level_2_music.mp3",
 	"level_3": "res://Musik/level_3_music.mp3",
-	"start_screen": "res://Musik/menu_music.mp3",
-	"level_selection": "res://Musik/menu_music.mp3"
+	"start_screen": "res://Musik/Menu_music.mp3",
+	"level_selection": "res://Musik/Menu_music.mp3"
 }
 
 # Volume settings
@@ -59,10 +59,9 @@ func play_music_for_scene(scene_name: String):
 		_play_track(track_path, volume_offset)
 
 func _play_track(path: String, offset: float = 0.0):
-	if not FileAccess.file_exists(path):
-		print("AudioManager Error: Music file not found at ", path)
-		return
-		
+	# Removed FileAccess.file_exists check because it can fail in exported builds 
+	# for internal resources. We rely on the load() result instead.
+	
 	var stream = load(path)
 	if stream:
 		_music_player.volume_db = music_volume_db + offset

@@ -2,13 +2,13 @@
 
 importer="mp3"
 type="AudioStreamMP3"
-uid="uid://ciw34hrwxduu2"
-path="res://.godot/imported/menu_music.mp3-1fa789b571370b569c53da0e5e498d75.mp3str"
+uid="uid://dttqvyw8jumno"
+path="res://.godot/imported/Menu_music.mp3-257adb8bc73d5686615baee2780b24d9.mp3str"
 
 [deps]
 
-source_file="res://Musik/menu_music.mp3"
-dest_files=["res://.godot/imported/menu_music.mp3-1fa789b571370b569c53da0e5e498d75.mp3str"]
+source_file="res://Musik/Menu_music.mp3"
+dest_files=["res://.godot/imported/Menu_music.mp3-257adb8bc73d5686615baee2780b24d9.mp3str"]
 
 [params]
 
