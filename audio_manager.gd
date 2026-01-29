@@ -30,6 +30,8 @@ func play_music_for_scene(scene_name: String):
 	
 	# Fuzzy matching for level names
 	var track_path = ""
+	var volume_offset = 0.0
+	
 	if "tutorial" in key:
 		track_path = _level_music["tutorial"]
 	elif "level_1" in key or "map1" in key or "level 1" in key:
@@ -40,21 +42,24 @@ func play_music_for_scene(scene_name: String):
 		track_path = _level_music["level_3"]
 	elif "start_screen" in key:
 		track_path = _level_music["start_screen"]
+		volume_offset = 12.0 # Make entrance music much louder as requested
 	elif "level_selection" in key:
 		track_path = _level_music["level_selection"]
+		volume_offset = 12.0 # Make entrance music much louder as requested
 	
 	if track_path != "" and track_path != _current_track:
-		_play_track(track_path)
+		_play_track(track_path, volume_offset)
 
-func _play_track(path: String):
+func _play_track(path: String, offset: float = 0.0):
 	if not FileAccess.file_exists(path):
 		print("AudioManager Error: Music file not found at ", path)
 		return
 		
 	var stream = load(path)
 	if stream:
+		_music_player.volume_db = music_volume_db + offset
+		
 		# Compatibility note: WAV files might need loop settings in the importer
-		# MP3 files in Godot 4 usually loop if configured on the stream
 		if stream is AudioStreamMP3:
 			stream.loop = true
 		elif stream is AudioStreamWAV:
@@ -63,7 +68,7 @@ func _play_track(path: String):
 		_music_player.stream = stream
 		_music_player.play()
 		_current_track = path
-		print("AudioManager: Playing ", path)
+		print("AudioManager: Playing ", path, " with offset ", offset)
 
 func set_volume(volume_db: float):
 	music_volume_db = volume_db

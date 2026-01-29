@@ -11,6 +11,8 @@ var levels = [
 ]
 
 var level_best_progress = {} # Map level_path -> int (0-100)
+var was_accessed_from_tutorial_button := false # Tracking tutorial access source
+var current_intro_index := 0 # For cycling dialogue
 
 func _ready():
 	load_game()

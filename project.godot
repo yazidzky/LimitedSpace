@@ -19,6 +19,7 @@ config/features=PackedStringArray("4.5", "Forward Plus")
 LoadingManager="*res://loading_manager.gd"
 AudioManager="*res://audio_manager.gd"
 GameManager="*res://game_manager.gd"
+DialogueSystem="*res://dialogue_system.tscn"
 
 [rendering]
 

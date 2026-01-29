@@ -8,7 +8,7 @@ var player: Node3D = null
 var has_key := false
 
 var _hud: CanvasLayer = null
-var _player_marker: Polygon2D = null
+var _player_marker: Control = null
 var _dist_value: Label = null
 var _total_dist_label: Label = null
 var _bar: ColorRect = null
@@ -122,6 +122,17 @@ func _on_key_collected():
 		if is_instance_valid(icon):
 			icon.color = Color(1, 0.9, 0.2) # Bright yellow/gold
 	
+	# PLAY KEY DIALOGUE
+	var scene_name = get_tree().current_scene.name.to_lower()
+	var key_dialogue = "key_pickup" # Default
+	if "tutorial" in scene_name: key_dialogue = "key_pickup_tutorial"
+	elif "level" in scene_name and "1" in scene_name: key_dialogue = "key_pickup_level_1"
+	elif "level" in scene_name and "2" in scene_name: key_dialogue = "key_pickup_level_2"
+	elif "level" in scene_name and "3" in scene_name: key_dialogue = "key_pickup_level_3"
+	
+	if has_node("/root/DialogueSystem"):
+		get_node("/root/DialogueSystem").start_dialogue(key_dialogue)
+	
 	if _collected_keys_count >= _required_keys.size():
 		has_key = true
 		print("OBJECTIVE COMPLETE: All keys collected! Exit unlocked.")
@@ -135,6 +146,7 @@ func _on_key_collected():
 	_update_current_target()
 	_calculate_initial_dist() # Refresh progress bar for next stage
 
+
 func _setup_hud():
 	var hud_scene = preload("res://hud.tscn")
 	if not hud_scene: return
@@ -143,7 +155,7 @@ func _setup_hud():
 	_player_marker = _hud.get_node("%PlayerMarker")
 	_dist_value = _hud.get_node("%DistanceValue")
 	_total_dist_label = _hud.get_node("%TotalDistance")
-	_bar = _hud.get_node("Container/VBoxContainer/ProgressBarContainer/Bar")
+	_bar = _hud.get_node("%Bar")
 	_percentage_label = _hud.get_node("%PercentageLabel")
 	_key_container = _hud.get_node("%KeyContainer")
 	
@@ -160,8 +172,10 @@ func _setup_hud():
 		# Add new icons based on key count
 		for i in range(_required_keys.size()):
 			var icon_rect = ColorRect.new()
-			icon_rect.custom_minimum_size = Vector2(25, 25)
+			icon_rect.custom_minimum_size = Vector2(20, 20)
 			icon_rect.color = Color(0.2, 0.2, 0.2, 0.8) # Dark grey initially
+			
+			icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			
 			# Add a subtle border or something to make it look like a key slot
 			var border = ReferenceRect.new()
@@ -215,52 +229,40 @@ func _setup_hud():
 func _style_button(btn: Button):
 	if not btn: return
 	
-	# Reference-inspired "Green Juicy" Style
-	var base_green = Color("74c636") # Vibrant Green
-	var dark_green = Color("4b8b22") # Darker Green/Shadow
-	var light_green = Color("8be645") # Highlight Green
+	var box_tex = load("res://ui/buttonbox.svg")
 	
 	# Normal Style
-	var style_normal = StyleBoxFlat.new()
-	style_normal.bg_color = base_green
-	style_normal.corner_radius_top_left = 16
-	style_normal.corner_radius_top_right = 16
-	style_normal.corner_radius_bottom_right = 16
-	style_normal.corner_radius_bottom_left = 16
-	style_normal.border_width_bottom = 6
-	style_normal.border_color = dark_green
-	style_normal.shadow_size = 2
-	style_normal.shadow_offset = Vector2(0, 2)
+	var style_normal = StyleBoxTexture.new()
+	style_normal.texture = box_tex
+	style_normal.texture_margin_left = 12
+	style_normal.texture_margin_top = 12
+	style_normal.texture_margin_right = 12
+	style_normal.texture_margin_bottom = 12
+	style_normal.modulate_color = Color(1, 1, 1, 0.9) # Light semi-trans
 	
 	# Hover Style
 	var style_hover = style_normal.duplicate()
-	style_hover.bg_color = light_green
+	style_hover.modulate_color = Color(0.8, 1, 0.8, 1) # Greenish hover
 	
 	# Pressed Style
 	var style_pressed = style_normal.duplicate()
-	style_pressed.bg_color = base_green
-	style_pressed.border_width_bottom = 2 # Compressed effect
-	style_pressed.border_width_top = 4 # Shift down visual
-	style_pressed.shadow_size = 0
-	
-	# Disabled Style
-	var style_disabled = style_normal.duplicate()
-	style_disabled.bg_color = Color("555555")
-	style_disabled.border_color = Color("333333")
+	style_pressed.modulate_color = Color(0.6, 0.7, 0.6, 1)
 	
 	btn.add_theme_stylebox_override("normal", style_normal)
 	btn.add_theme_stylebox_override("hover", style_hover)
 	btn.add_theme_stylebox_override("pressed", style_pressed)
-	btn.add_theme_stylebox_override("disabled", style_disabled)
-	btn.add_theme_stylebox_override("focus", style_normal) # No focus ring
+	btn.add_theme_stylebox_override("focus", style_normal)
 	
-	# Text styling
+	# Text styling (for fallback text)
 	btn.add_theme_color_override("font_color", Color.WHITE)
-	btn.add_theme_color_override("font_outline_color", Color("2a4d13"))
-	btn.add_theme_constant_override("outline_size", 4)
-	btn.add_theme_constant_override("font_size", 24)
+	btn.add_theme_color_override("font_outline_color", Color.BLACK)
+	btn.add_theme_constant_override("outline_size", 6)
+	btn.add_theme_constant_override("font_size", 28)
 
-func _on_pause_pressed(): _toggle_pause(true)
+func _on_pause_pressed(): 
+	# Don't allow pausing if victory menu is already shown
+	if _victory_menu and _victory_menu.visible: return
+	_toggle_pause(true)
 func _on_resume_pressed(): _toggle_pause(false)
 func _on_restart_pressed():
 	_toggle_pause(false)
@@ -276,6 +278,17 @@ func _toggle_pause(should_pause: bool):
 	get_tree().paused = should_pause
 	if _pause_menu: _pause_menu.visible = should_pause
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	
+	# Hide Dialogue System when Paused to prevent overlap
+	if has_node("/root/DialogueSystem"):
+		var ds = get_node("/root/DialogueSystem")
+		if ds.visible and should_pause:
+			ds.visible = false
+			# We'll store its state to show it back on resume if needed
+			_pause_menu.set_meta("was_dialogue_visible", true)
+		elif not should_pause and _pause_menu.has_meta("was_dialogue_visible"):
+			ds.visible = true
+			_pause_menu.remove_meta("was_dialogue_visible")
 	
 	# Hide Tutorial Overlay when Paused
 	var tut_overlay = get_node_or_null("TutorialOverlay")
@@ -422,8 +435,8 @@ func _update_ui(current_dist: float):
 	
 	if _initial_dist > 0:
 		var progress = 1.0 - clamp(current_dist / _initial_dist, 0.0, 1.0)
-		var bar_width = 500.0
-		if _player_marker: _player_marker.position.x = progress * bar_width
+		var bar_width = 564.0 # Matches the inner space of the SVG
+		if _player_marker: _player_marker.position.x = 18.0 + (progress * bar_width) - (_player_marker.size.x / 2.0)
 		if _bar: _bar.size.x = progress * bar_width
 		if _percentage_label:
 			_percentage_label.text = "%d%%" % int(progress * 100)
@@ -440,15 +453,48 @@ var _loading_in_progress = false
 
 func _change_level():
 	if _loading_in_progress: return
+	_loading_in_progress = true # Prevent multiple triggers
+	
+	# Stop gameplay immediately
+	set_physics_process(false)
+	if player and player is PhysicsBody3D:
+		player.set_physics_process(false)
+		player.velocity = Vector3.ZERO
+	
+	# PLAY ENDING DIALOGUE
+	var scene_name = get_tree().current_scene.name.to_lower()
+	var end_dialogue = ""
+	if "tutorial" in scene_name: end_dialogue = "tutorial_end"
+	elif "level" in scene_name and "1" in scene_name: end_dialogue = "level_1_end"
+	elif "level" in scene_name and "2" in scene_name: end_dialogue = "level_2_end"
+	elif "level" in scene_name and "3" in scene_name: end_dialogue = "level_3_end"
+	
+	if end_dialogue != "" and has_node("/root/DialogueSystem"):
+		var ds = get_node("/root/DialogueSystem")
+		ds.start_dialogue(end_dialogue)
+		await ds.dialogue_finished
 	
 	# Instead of changing immediately, show Victory Screen
 	if _victory_menu:
-		set_physics_process(false) # Stop gameplay
+		# Close Pause Menu if it was open
+		if _pause_menu:
+			_pause_menu.visible = false
+			get_tree().paused = false
+		
+		# Hide the Pause Button itself during Victory
+		var pause_btn = _hud.get_node_or_null("%PauseButton")
+		if pause_btn: pause_btn.visible = false
+		
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 		_victory_menu.visible = true
 		
-		# Save Progress Immediately on Victory
+		# HIDE CONTINUE BUTTON IF ACCESSED FROM START SCREEN TUTORIAL BUTTON
 		var gm = get_node_or_null("/root/GameManager")
+		if gm and gm.was_accessed_from_tutorial_button and "tutorial" in scene_name:
+			if _victory_next_btn: _victory_next_btn.visible = false
+			print("CONTINUE HIDDEN: Tutorial accessed from Start Screen.")
+		
+		# Save Progress Immediately on Victory
 		if gm and gm.has_method("complete_level"):
 			gm.complete_level(get_tree().current_scene.scene_file_path)
 	else:
@@ -456,9 +502,14 @@ func _change_level():
 		_on_next_level_pressed()
 
 func _on_next_level_pressed():
-	if _loading_in_progress: return
-	_loading_in_progress = true
+	# If loading is already in progress, don't trigger again
+	# But we need to distinguish between showing the menu and actually changing scene
 	
+	if next_level == "" or next_level == "res://start_screen.tscn":
+		# If no next level is defined, go back to menu
+		_on_main_menu_pressed()
+		return
+
 	if has_node("/root/LoadingManager"):
 		get_node("/root/LoadingManager").load_level(next_level)
 	else:

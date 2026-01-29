@@ -402,9 +402,14 @@ func _physics_process(delta: float) -> void:
 			var s_v_x = s_v_y.cross(s_v_z).normalized()
 			s_v_z = s_v_x.cross(s_v_y).normalized()
 			
-			# Face direction of movement
+		# Face direction of movement
 			var target_basis = Basis(s_v_x, s_v_y, s_v_z)
-			_skin.global_basis = _skin.global_basis.slerp(target_basis, delta * 15.0)
+			# FIX: Slerp with scale support
+			var current_scale = _skin.scale
+			var rot_quat = _skin.global_basis.get_rotation_quaternion()
+			var target_quat = target_basis.get_rotation_quaternion()
+			var new_rot = rot_quat.slerp(target_quat, delta * 15.0)
+			_skin.global_basis = Basis(new_rot).scaled(current_scale)
 		else:
 			has_target = false
 			_move_target_inst.visible = false
@@ -429,7 +434,12 @@ func _physics_process(delta: float) -> void:
 		
 		# Sophia faces v_z. The PI rotation is to align the specific model's forward
 		var target_basis = Basis(v_x, v_y, v_z)
-		_skin.global_basis = _skin.global_basis.slerp(target_basis, delta * 10.0)
+		# FIX: Slerp with scale support
+		var current_scale = _skin.scale
+		var rot_quat = _skin.global_basis.get_rotation_quaternion()
+		var target_quat = target_basis.get_rotation_quaternion()
+		var new_rot = rot_quat.slerp(target_quat, delta * 10.0)
+		_skin.global_basis = Basis(new_rot).scaled(current_scale)
 
 	# ===== FINAL UPDATES =====
 	# 1. Selection Circle: Robust orientation flush to plane
