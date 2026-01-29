@@ -505,7 +505,6 @@ func _change_level():
 			print("CONTINUE HIDDEN: Tutorial accessed from Start Screen.")
 		
 		# Save Progress Immediately on Victory
-		var gm = get_node_or_null("/root/GameManager")
 		if gm and gm.has_method("complete_level"):
 			gm.complete_level(get_tree().current_scene.scene_file_path)
 	else:
