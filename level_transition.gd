@@ -271,8 +271,10 @@ func _on_restart_pressed():
 
 func _on_main_menu_pressed():
 	_toggle_pause(false)
+	if not is_inside_tree(): return
+	
 	if has_node("/root/LoadingManager"): get_node("/root/LoadingManager").load_level("res://start_screen.tscn")
-	else: get_tree().change_scene_to_file("res://start_screen.tscn")
+	elif get_tree(): get_tree().change_scene_to_file("res://start_screen.tscn")
 
 func _toggle_pause(should_pause: bool):
 	get_tree().paused = should_pause
@@ -474,10 +476,13 @@ func _change_level():
 		ds.start_dialogue(end_dialogue)
 		await ds.dialogue_finished
 		
+		if not is_inside_tree(): return
+		
 		# If it's the last level, play the overall game ending dialogue
 		if end_dialogue == "level_3_end":
 			ds.start_dialogue("game_ending")
 			await ds.dialogue_finished
+			if not is_inside_tree(): return
 	
 	# Instead of changing immediately, show Victory Screen
 	if _victory_menu:
@@ -500,6 +505,7 @@ func _change_level():
 			print("CONTINUE HIDDEN: Tutorial accessed from Start Screen.")
 		
 		# Save Progress Immediately on Victory
+		var gm = get_node_or_null("/root/GameManager")
 		if gm and gm.has_method("complete_level"):
 			gm.complete_level(get_tree().current_scene.scene_file_path)
 	else:
@@ -507,8 +513,7 @@ func _change_level():
 		_on_next_level_pressed()
 
 func _on_next_level_pressed():
-	# If loading is already in progress, don't trigger again
-	# But we need to distinguish between showing the menu and actually changing scene
+	if not is_inside_tree(): return
 	
 	if next_level == "" or next_level == "res://start_screen.tscn":
 		# If no next level is defined, go back to menu
@@ -517,5 +522,5 @@ func _on_next_level_pressed():
 
 	if has_node("/root/LoadingManager"):
 		get_node("/root/LoadingManager").load_level(next_level)
-	else:
+	elif get_tree():
 		get_tree().change_scene_to_file(next_level)

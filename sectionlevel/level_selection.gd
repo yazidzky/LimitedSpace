@@ -1,5 +1,7 @@
 extends Node3D
 
+var _loading_in_progress = false
+
 # Map node names to level paths, label text, and glow colors
 var level_map = {
 	"circle_002": {
@@ -271,9 +273,12 @@ func _create_interaction(mesh_node: Node, data: Dictionary):
 	print("Zone Created: " + data["label"] + " Radius: 8.0")
 
 func _on_level_area_entered(body, data):
+	if _loading_in_progress: return
+	
 	print("HIT ZONE PROBE: ", body.name, " Type: ", body.get_class())
 	# Accept ANY CharacterBody3D or Player group
 	if body is CharacterBody3D or body.is_in_group("player") or "Player" in body.name:
+		_loading_in_progress = true
 		print(">>> VALID PLAYER DETECTED! Playing Story then Loading: ", data["file"])
 		
 		# Stop Player
@@ -291,14 +296,20 @@ func _on_level_area_entered(body, data):
 		call_deferred("_load_level", data["file"])
 
 func _load_level(path):
+	if not is_inside_tree():
+		_loading_in_progress = false
+		return
+		
 	var gm = get_node_or_null("/root/GameManager")
 	if gm and "tutorial" in path.to_lower():
 		gm.was_accessed_from_tutorial_button = false
 		
 	if has_node("/root/LoadingManager"):
 		get_node("/root/LoadingManager").load_level(path)
-	else:
+	elif get_tree():
 		get_tree().change_scene_to_file(path)
+	else:
+		_loading_in_progress = false
 
 func _find_node_by_name_pattern(root: Node, pattern: String) -> Node:
 	if root.name.to_lower().contains(pattern.to_lower()):
