@@ -8,7 +8,9 @@ var _level_music = {
 	"tutorial": "res://Musik/Borealis.mp3",
 	"level_1": "res://Musik/Old_Chimney_maintheme.mp3",
 	"level_2": "res://Musik/Clair Obscur_ Expedition 33 (Original Soundtrack) 100 - Sirène - Robe de Jour.mp3",
-	"level_3": "res://Musik/Clair Obscur_ Expedition 33 - Gustave (Original Soundtrack).mp3"
+	"level_3": "res://Musik/Clair Obscur_ Expedition 33 - Gustave (Original Soundtrack).mp3",
+	"start_screen": "res://Musik/Clair Obscur_ Expedition 33 _ Lumière - Piano Version.mp3",
+	"level_selection": "res://Musik/Clair Obscur_ Expedition 33 _ Lumière - Piano Version.mp3"
 }
 
 # Volume settings
@@ -36,6 +38,10 @@ func play_music_for_scene(scene_name: String):
 		track_path = _level_music["level_2"]
 	elif "level_3" in key or "map3" in key or "level 3" in key:
 		track_path = _level_music["level_3"]
+	elif "start_screen" in key:
+		track_path = _level_music["start_screen"]
+	elif "level_selection" in key:
+		track_path = _level_music["level_selection"]
 	
 	if track_path != "" and track_path != _current_track:
 		_play_track(track_path)
