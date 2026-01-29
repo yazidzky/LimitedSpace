@@ -465,14 +465,19 @@ func _change_level():
 	var scene_name = get_tree().current_scene.name.to_lower()
 	var end_dialogue = ""
 	if "tutorial" in scene_name: end_dialogue = "tutorial_end"
-	elif "level" in scene_name and "1" in scene_name: end_dialogue = "level_1_end"
-	elif "level" in scene_name and "2" in scene_name: end_dialogue = "level_2_end"
-	elif "level" in scene_name and "3" in scene_name: end_dialogue = "level_3_end"
+	elif ("level" in scene_name and "1" in scene_name) or ("map" in scene_name and "1" in scene_name): end_dialogue = "level_1_end"
+	elif ("level" in scene_name and "2" in scene_name) or ("map" in scene_name and "2" in scene_name): end_dialogue = "level_2_end"
+	elif ("level" in scene_name and "3" in scene_name) or ("map" in scene_name and "3" in scene_name): end_dialogue = "level_3_end"
 	
 	if end_dialogue != "" and has_node("/root/DialogueSystem"):
 		var ds = get_node("/root/DialogueSystem")
 		ds.start_dialogue(end_dialogue)
 		await ds.dialogue_finished
+		
+		# If it's the last level, play the overall game ending dialogue
+		if end_dialogue == "level_3_end":
+			ds.start_dialogue("game_ending")
+			await ds.dialogue_finished
 	
 	# Instead of changing immediately, show Victory Screen
 	if _victory_menu:

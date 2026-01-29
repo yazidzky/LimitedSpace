@@ -94,6 +94,19 @@ var story_data = {
 	],
 	"key_pickup_level_3": [
 		{"name": "Architect", "text": "A memory shard. Be careful not to cut yourself on the past."}
+	],
+	"game_ending": [
+		{"name": "System", "text": "CRITICAL ALERT: Simulation integrity reached 100%."},
+		{"name": "Sophia", "text": "Is it... over? Everything feels so clear now."},
+		{"name": "Architect", "text": "You have traversed the limited space and found the infinite within."},
+		{"name": "Architect", "text": "The Abyss is no longer your prison. It is your playground."},
+		{"name": "Sophia", "text": "Thank you... Architect."},
+		{"name": "System", "text": "Ending Sequence: Finalized. Subject Status: Awakened."}
+	],
+	"game_completed_greeting": [
+		{"name": "Architect", "text": "The Master of the Abyss returns."},
+		{"name": "Sophia", "text": "I feel different. I'm not afraid anymore."},
+		{"name": "Architect", "text": "Your progress is recorded. You are free to roam or refine your skills."}
 	]
 }
 

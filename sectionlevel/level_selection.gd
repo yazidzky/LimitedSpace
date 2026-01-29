@@ -79,6 +79,10 @@ func _ready():
 	if gm:
 		key = intro_keys[gm.current_intro_index]
 		gm.current_intro_index = (gm.current_intro_index + 1) % intro_keys.size()
+		
+		# OVERRIDE: If all maps are completed, show the special greeting
+		if gm.level_best_progress.get("res://Map/level_3.tscn", 0) == 100:
+			key = "game_completed_greeting"
 	
 	_play_story(key)
 
